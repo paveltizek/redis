@@ -29,17 +29,21 @@ final class RedisStorage implements IStorage
 	 */
 	public function write(string $key, $data, array $dependencies): void
 	{
-		$this->client->set($key, $data);
+
+		$this->client->set($key, serialize($data));
 
 		if (isset($dependencies[Cache::EXPIRATION])) {
-			$expiration = (int) $dependencies[Cache::EXPIRATION];
+			$expiration = (int)$dependencies[Cache::EXPIRATION];
 
-			if ($dependencies[Cache::SLIDING] !== true) {
-				$this->client->expireat($key, time() + $expiration);
-			} else {
-				$this->client->expire($key, $expiration);
-			}
-		}
+            if (array_key_exists(Cache::SLIDING, $dependencies)) {
+                if ($dependencies[Cache::SLIDING] !== true) {
+                    $expiration += time();
+                }
+            }
+
+            $this->client->expire($key, $expiration);
+
+        }
 	}
 
 	/**
@@ -50,6 +54,12 @@ final class RedisStorage implements IStorage
 	{
 		$val = $this->client->get($key);
 
+		if ($val){
+            $data = @unserialize($val);
+            if ($data !== false) {
+                $val = $data;
+            }
+        }
 		try {
 			return $val;
 		} catch (Throwable $e) {
